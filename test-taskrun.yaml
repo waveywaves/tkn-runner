@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  name: hello-world
+spec:
+  taskSpec:
+    steps:
+    - name: hello
+      image: ubuntu:22.04
+      script: |
+        #!/bin/bash
+        echo "Hello from Tekton Runner!"
+        echo "Current date: $(date)"
+        echo "Hostname: $(hostname)"
+        echo "This is running in Podman, not Kubernetes!"

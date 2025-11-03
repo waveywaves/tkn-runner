@@ -1,0 +1,155 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build artifacts
+/tkn-runner
+/bin/
+/.bin/
+*.test
+*.out
+*.prof
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+*.coverprofile
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories (if vendored but not committed)
+/vendor/
+
+# Temporary build directory
+.gopath
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Kubernetes & K3s
+kubeconfig
+*.kubeconfig
+.kube/
+kind.yaml
+k3s.yaml
+
+# Tekton artifacts
+*.yaml.bak
+*.yml.bak
+
+# Test artifacts and temporary files
+/test/tmp/
+/tmp/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Profiling
+cpu.prof
+mem.prof
+*.pprof
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+
+# Linux specific
+*~
+.directory
+.Trash-*
+.nfs*
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Build and debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Distribution / packaging
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Certificate and key files (be careful!)
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# Go generated files
+*_generated.go
+zz_generated.*.go
+
+# Release archives (from pipeline submodule pattern)
+cmd/*/kodata/source.tar.gz

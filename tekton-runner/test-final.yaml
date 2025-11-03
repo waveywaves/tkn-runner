@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: final-test-run
+  namespace: default
+spec:
+  taskSpec:
+    steps:
+    - name: echo-hello
+      image: alpine:latest
+      command: ['echo']
+      args: ['Hello from final test!']
+    - name: check-environment
+      image: alpine:latest
+      command: ['sh', '-c']
+      args: ['echo "Current user: $(whoami)" && echo "Current directory: $(pwd)" && ls -la /tekton || echo "/tekton not accessible"']
+    - name: write-and-read
+      image: alpine:latest
+      command: ['sh', '-c']
+      args: ['echo "Test data" > /tekton/test-file.txt && cat /tekton/test-file.txt && echo "File operation successful!"']
