@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maven-settings
+data:
+  settings.xml: "<settings><offline>true</offline></settings>"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: local-build-token
+type: Opaque
+stringData:
+  token: local-fixture-only
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: prepare-source
+spec:
+  workspaces:
+    - name: source
+  results:
+    - name: marker
+  steps:
+    - name: write
+      image: docker.io/library/busybox:1.36.1
+      script: |
+        #!/bin/sh
+        set -eu
+        printf 'local-source' > "$(workspaces.source.path)/marker"
+        printf 'local-source' > "$(results.marker.path)"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: verify-build-inputs
+spec:
+  params:
+    - name: marker
+      type: string
+  workspaces:
+    - name: source
+    - name: settings
+  steps:
+    - name: verify
+      image: docker.io/library/busybox:1.36.1
+      env:
+        - name: EXPECTED_MARKER
+          value: $(params.marker)
+        - name: BUILD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: local-build-token
+              key: token
+      script: |
+        #!/bin/sh
+        set -eu
+        test "$(cat "$(workspaces.source.path)/marker")" = "$EXPECTED_MARKER"
+        grep -q '<offline>true</offline>' "$(workspaces.settings.path)/settings.xml"
+        test "$BUILD_TOKEN" = local-fixture-only
+        printf 'verified workspace, settings and development credential\n'
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: local-build
+spec:
+  workspaces:
+    - name: source
+    - name: settings
+  tasks:
+    - name: prepare
+      taskRef:
+        name: prepare-source
+      workspaces:
+        - name: source
+          workspace: source
+    - name: verify
+      taskRef:
+        name: verify-build-inputs
+      params:
+        - name: marker
+          value: $(tasks.prepare.results.marker)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: settings
+          workspace: settings
+  finally:
+    - name: finish
+      taskSpec:
+        steps:
+          - name: report
+            image: docker.io/library/busybox:1.36.1
+            script: |
+              #!/bin/sh
+              printf 'finally executed\n'

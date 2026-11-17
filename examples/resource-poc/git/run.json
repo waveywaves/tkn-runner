@@ -1,0 +1,22 @@
+{
+  "apiVersion": "tekton.dev/v1",
+  "kind": "PipelineRun",
+  "metadata": {"generateName": "git-resolution-"},
+  "spec": {
+    "timeouts": {"pipeline": "5m"},
+    "pipelineSpec": {
+      "tasks": [{
+        "name": "check",
+        "taskRef": {
+          "resolver": "git",
+          "params": [
+            {"name": "url", "value": "git://git-fixture.invalid/fixture.git"},
+            {"name": "revision", "value": "main"},
+            {"name": "pathInRepo", "value": "task.yaml"}
+          ]
+        }
+      }],
+      "results": [{"name": "outcome", "value": "$(tasks.check.results.outcome)"}]
+    }
+  }
+}

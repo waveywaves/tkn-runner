@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-fixture
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: resource-poc-git
+  template:
+    metadata:
+      labels:
+        app: resource-poc-git
+    spec:
+      containers:
+        - name: git
+          image: docker.io/alpine/git@sha256:2306e2b05ee0ef99f5d25b0779f645b24ae9f91ba187107503592fcdfe78da3a
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              git init --bare /tmp/fixture.git
+              {
+                printf 'blob\nmark :1\ndata %s\n' "$(wc -c < /fixture/task.yaml)"
+                cat /fixture/task.yaml
+                printf '\ncommit refs/heads/main\ncommitter Fixture <fixture@localhost> 0 +0000\ndata 7\nfixture\nM 100644 :1 task.yaml\n\n'
+              } | git --git-dir=/tmp/fixture.git fast-import
+              git --git-dir=/tmp/fixture.git symbolic-ref HEAD refs/heads/main
+              exec git daemon --reuseaddr --export-all --base-path=/tmp --listen=0.0.0.0 /tmp/fixture.git
+          readinessProbe:
+            tcpSocket:
+              port: 9418
+          volumeMounts:
+            - name: fixture
+              mountPath: /fixture
+              readOnly: true
+      volumes:
+        - name: fixture
+          configMap:
+            name: git-task
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-fixture
+spec:
+  selector:
+    app: resource-poc-git
+  ports:
+    - port: 9418
+      targetPort: 9418

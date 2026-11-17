@@ -1,0 +1,19 @@
+{
+  "apiVersion": "tekton.dev/v1",
+  "kind": "PipelineRun",
+  "metadata": {"generateName": "bundle-resolution-"},
+  "spec": {
+    "timeouts": {"pipeline": "5m"},
+    "pipelineRef": {
+      "resolver": "bundles",
+      "params": [
+        {"name": "bundle", "value": "registry.invalid/resource-poc@sha256:0000000000000000000000000000000000000000000000000000000000000000"},
+        {"name": "name", "value": "bundled-pipeline"},
+        {"name": "kind", "value": "pipeline"}
+      ]
+    },
+    "params": [
+      {"name": "bundle", "value": "registry.invalid/resource-poc@sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+    ]
+  }
+}

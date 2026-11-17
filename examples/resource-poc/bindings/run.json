@@ -1,0 +1,13 @@
+{
+  "apiVersion": "tekton.dev/v1",
+  "kind": "PipelineRun",
+  "metadata": {"generateName": "bindings-"},
+  "spec": {
+    "timeouts": {"pipeline": "5m"},
+    "pipelineRef": {"name": "local-build"},
+    "workspaces": [
+      {"name": "source", "persistentVolumeClaim": {"claimName": "shared-pvc"}},
+      {"name": "settings", "configMap": {"name": "maven-settings"}}
+    ]
+  }
+}

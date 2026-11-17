@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-check
+spec:
+  results:
+    - name: outcome
+  steps:
+    - name: check
+      image: docker.io/library/busybox:1.36.1
+      script: |
+        #!/bin/sh
+        set -eu
+        printf 'resolved-from-git' > "$(results.outcome.path)"
