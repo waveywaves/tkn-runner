@@ -1,5 +1,10 @@
 # Tekton Runner v2: Virtual Kubelet Architecture
 
+> Historical architecture proposal. Feature inheritance, compatibility, and
+> resource figures below are not verified guarantees. See the
+> [PoC assessment](local-validation-assessment.md) and
+> [local-ecosystem proposal](v4-local-tekton-ecosystem.md).
+
 ## Executive Summary
 
 This document outlines the Virtual Kubelet-based architecture for running Tekton Pipelines without Kubernetes worker nodes. Unlike the v1 design which proposed a custom controller watching the `managedBy` field, v2 leverages Virtual Kubelet to intercept Pod lifecycle events and translate them to Podman execution.

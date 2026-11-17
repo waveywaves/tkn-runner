@@ -1,5 +1,9 @@
 # Tekton Runner: Running Tekton Without Kubernetes Workers
 
+> Historical design, not the current implementation or an approved roadmap.
+> See the [PoC assessment](local-validation-assessment.md) and
+> [local-ecosystem proposal](v4-local-tekton-ecosystem.md) for the current direction.
+
 ## Executive Summary
 
 This document outlines the design for a Tekton execution service that leverages Tekton's API and workflow definitions while executing tasks outside of Kubernetes. Inspired by vCluster Standalone and Replicated Embedded Cluster, this approach uses a lightweight Kubernetes control plane solely as an API server and state store, while delegating actual task execution to external runtimes like Podman, Dagger, or other CI backends.

@@ -1,29 +1,44 @@
 # tkn-runner
 
-> Run Tekton Pipelines locally without Kubernetes
+> Experimental local Tekton execution using k3s and a Podman adapter
 
-**tkn-runner** is a lightweight tool that lets you run [Tekton Pipelines](https://tekton.dev) on your local machine using Podman, without requiring a full Kubernetes cluster. It combines a minimal k3s control plane with Virtual Kubelet to execute Tekton TaskRuns and PipelineRuns using local container runtimes.
+**tkn-runner** is a proof of concept combining a k3s control plane, the standard
+[Tekton Pipelines](https://tekton.dev) controller, and a custom virtual-node
+provider that translates Pods into Podman container commands.
+
+It is not a Kubernetes-free engine or a fully compatible local Tekton runtime.
+The next iteration targets the full Tekton ecosystem running locally, with
+one `tkn-runner` binary using an existing Podman installation. Real Kubernetes
+workers and upstream Tekton components would run inside that local environment;
+no remote cluster or separately installed cluster CLI would be required.
+
+- [Current PoC assessment and architectural drift](designs/local-validation-assessment.md)
+- [Current proposal: full local Tekton ecosystem](designs/v4-local-tekton-ecosystem.md)
+- [Superseded Task-only proposal](designs/v3-local-validation.md)
+
+The proposal is not implemented. The binary currently supports only `start`
+and `delete`; the proposed environment and run commands are not available.
 
 ## Why tkn-runner?
 
 Tekton Pipelines is a powerful Kubernetes-native CI/CD framework, but it requires a full Kubernetes cluster to run. Setting up Kubernetes locally (minikube, kind, etc.) can be resource-intensive and complex for development and testing.
 
-**tkn-runner** solves this by:
-- Providing a single binary that bundles everything you need
-- Using k3s (lightweight Kubernetes) for the control plane
-- Running containers via Podman instead of requiring worker nodes
-- Keeping resource usage minimal while maintaining full Tekton compatibility
+The PoC explores retaining Tekton's controller while executing its Pods through
+Podman. It moves compatibility work into the worker adapter rather than
+eliminating Kubernetes semantics. Footprint and speed advantages over a warm
+local cluster have not been established by benchmarks.
 
-## Features
+## Implemented building blocks
 
-- **Full Tekton Support**: Run TaskRuns and PipelineRuns with unmodified Tekton code
-- **Lightweight**: Single binary with minimal resource footprint
-- **No Kubernetes Cluster Required**: Uses k3s control plane + Virtual Kubelet + Podman
-- **Cross-Platform**: macOS (Intel & Apple Silicon) and Linux support
-- **Service Accounts**: Full support for Kubernetes service account tokens
-- **Volumes**: emptyDir, downwardAPI, serviceAccount volumes
-- **Results**: Extract and use task results
-- **Standard Tools**: Use `kubectl` and `tkn` CLI as normal
+- k3s startup and embedded Tekton CRD/controller installation.
+- Virtual-node registration and a Pod watcher.
+- Podman execution of init containers and steps, with basic sidecar handling.
+- Named volumes and partial service-account/downward-API file handling.
+- Standard Kubernetes API access for inspecting resources.
+
+These are implementation components, not a compatibility certification. Logs,
+results, lifecycle status, workspace semantics, and platform behavior have
+important gaps described in the assessment.
 
 ## Architecture
 
@@ -37,7 +52,7 @@ Tekton Pipelines is a powerful Kubernetes-native CI/CD framework, but it require
 │  │   Plane      │─────▶│    Provider      │   │
 │  │              │      │                  │   │
 │  │ • API Server │      │ • Pod Intercept  │   │
-│  │ • etcd       │      │ • K8s→Podman     │   │
+│  │ • State      │      │ • K8s→Podman     │   │
 │  │ • Scheduler  │      │ • Status Sync    │   │
 │  └──────────────┘      └──────────────────┘   │
 │         │                       │              │
@@ -54,13 +69,13 @@ Tekton Pipelines is a powerful Kubernetes-native CI/CD framework, but it require
 1. k3s provides the Kubernetes API and runs the Tekton Pipeline Controller
 2. Virtual Kubelet registers a fake node and intercepts Pod scheduling
 3. When Tekton creates Pods, Virtual Kubelet translates them to Podman containers
-4. Containers execute on your host, and status syncs back to Tekton
+4. Containers execute in Podman's runtime (a Linux VM on macOS), and the adapter reports status back to Tekton
 
 ## Prerequisites
 
 - **Podman**: Container runtime (install via `brew install podman` on macOS or your package manager on Linux)
 - **Go 1.25+**: For building from source
-- **kubectl** (optional): For interacting with the cluster
+- **kubectl** (required): Controller installation invokes it
 - **tkn CLI** (optional): For Tekton-specific commands
 
 ## Installation
@@ -90,7 +105,7 @@ This will:
 ### 2. Set your kubeconfig
 
 ```bash
-export KUBECONFIG=~/.tkn-runner/k3s.yaml
+export KUBECONFIG=~/.tkn-runner/k3s/k3s.yaml
 ```
 
 ### 3. Run a TaskRun
@@ -121,9 +136,13 @@ kubectl apply -f hello-world.yaml
 # Check status
 kubectl get taskrun
 
-# View logs
-tkn taskrun logs hello-world-taskrun -f
+# Inspect the recorded status (the adapter's status reporting is incomplete)
+kubectl get taskrun hello-world-taskrun -o yaml
 ```
+
+Container output is printed by the foreground runner. The kubelet logs
+endpoint is not implemented, so standard `kubectl logs` / `tkn ... logs`
+should not be relied on.
 
 ### 4. Clean up
 
@@ -131,7 +150,10 @@ tkn taskrun logs hello-world-taskrun -f
 ./tkn-runner delete
 ```
 
-This removes all tkn-runner resources including k3s data, Podman networks, and containers.
+This command attempts to remove k3s data, Podman networks, and containers.
+It also runs an unscoped `podman volume prune -f`, which can remove unused
+volumes unrelated to tkn-runner. Review this behavior before using it on a
+shared runtime.
 
 ## Usage
 
@@ -160,9 +182,6 @@ tkn taskrun list
 # View TaskRun details
 tkn taskrun describe hello-world-taskrun
 
-# Stream logs
-tkn taskrun logs hello-world-taskrun -f
-
 # Delete a TaskRun
 kubectl delete taskrun hello-world-taskrun
 ```
@@ -176,15 +195,14 @@ More examples are available in the [`examples/`](./examples) directory:
 ## Platform Support
 
 ### macOS
-- **Status**: Fully supported and tested
-- **Versions**: Ventura, Sonoma, Sequoia
-- **Architectures**: Intel (x86_64) and Apple Silicon (arm64)
-- **Networking**: k3s runs in Podman container with Podman networking
+- **Status**: Prototype implementation; no cross-platform test suite.
+- **Runtime**: k3s runs in a Podman container. Podman requires a Linux VM.
+- **Networking**: Custom Podman network shared by the control plane and workloads.
 
 ### Linux
 - **Status**: In development (Phase 1 - CNI implementation in progress)
-- **Distributions**: Ubuntu 22.04+, Fedora, RHEL
-- **Networking**: k3s runs natively with Flannel CNI
+- **Runtime**: Native k3s startup differs from the macOS path and currently does not disable its agent. The embedded binary is Linux ARM64.
+- **Networking**: Linux integration remains incomplete; distribution compatibility is not established.
 
 ## Current Limitations
 
@@ -193,12 +211,18 @@ This project is under active development. Current limitations include:
 - Linux Flannel CNI integration is in progress
 - ConfigMap/Secret environment variable references not yet supported
 - Log streaming via `kubectl logs` not yet implemented
-- No systemd service mode
+- Results extraction and faithful per-step status are incomplete
+- No ingestion of local uncommitted source
+- Unsupported inputs can be approximated or ignored rather than rejected
 
 ## Architecture Documentation
 
-Detailed architecture documentation is available in:
-- [`designs/v2-virtual-kubelet.md`](./designs/v2-virtual-kubelet.md) - Complete architectural overview and design decisions
+Start with the [assessment](designs/local-validation-assessment.md) and
+[full-ecosystem proposal](designs/v4-local-tekton-ecosystem.md). The
+[v1](designs/v1-managed-by-controller.md) and
+[v2](designs/v2-virtual-kubelet.md) documents are historical designs, and
+[v3](designs/v3-local-validation.md) is a superseded restricted-execution
+proposal. None is a verified feature inventory.
 
 ## Project Structure
 
@@ -211,35 +235,24 @@ tkn-runner/
 │   ├── virtualkubelet/      # Virtual Kubelet provider & Podman executor
 │   └── manifests/           # Embedded Tekton CRDs & controller
 ├── examples/                # Sample TaskRun YAML files
-├── designs/                 # Architecture documentation
-└── docs/                    # Implementation notes
+└── designs/                 # Assessment, proposal, and historical designs
 ```
 
-## How It's Different
+## Comparison with a local cluster
 
-**vs. Full Kubernetes:**
-- Much lighter weight (single binary vs. multi-node cluster)
-- Faster startup time
-- Lower resource usage
-- Perfect for local development and testing
+The PoC retains Tekton reconciliation but replaces normal worker execution.
+That makes the adapter responsible for storage, lifecycle, logs, networking,
+and other semantics the controller expects. A warm local Kubernetes installation
+is the appropriate correctness and performance baseline.
 
-**vs. Tekton on minikube/kind:**
-- No VM or nested containers required on macOS
-- Direct Podman integration
-- Simpler networking model
-- Easier to debug and understand
-
-**Key Design Decision:**
-- Uses **Virtual Kubelet pattern** instead of custom controllers
-- This allows running **unmodified Tekton code** with automatic feature inheritance
-- Platform-specific optimizations (macOS vs Linux) for best performance
+No measured speed, memory, or full-compatibility advantage is claimed.
 
 ## Contributing
 
-Contributions are welcome! Current priorities include:
-- Linux Flannel CNI implementation (Phase 1 - HIGH PRIORITY)
-- Testing and validation
-- Documentation improvements
+Contributions are welcome. Before expanding runtime compatibility, review the
+full-ecosystem contract and its acceptance criteria. The implementation
+direction is real Tekton on real local Kubernetes workers, not further
+approximation in the virtual-node adapter.
 
 ## License
 
